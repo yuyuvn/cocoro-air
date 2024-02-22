@@ -29,13 +29,13 @@ async def async_setup_platform(
         discovery_info: DiscoveryInfoType | None = None
 ) -> None:
     """Set up the sensor platform."""
-    # if discovery_info is None:
-    #     return
+    if discovery_info is None:
+        return
 
     _LOGGER.debug("Setting up sensor platform.")
 
-    cocoro_air = hass.data[DOMAIN]["cocoro_air"]
-    coordinator = MyCoordinator(hass, cocoro_air)
+    cocoro_air_api = hass.data[DOMAIN]["cocoro_air_api"]
+    coordinator = MyCoordinator(hass, cocoro_air_api)
 
     async_add_entities([
         CocoroAirTemperatureSensor(coordinator),
@@ -75,6 +75,7 @@ class CocoroAirSensorBase(CoordinatorEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_name = name
+        self._attr_unique_id = f"{DOMAIN}_{name.lower()}"
         self._attr_device_class = device_class
         self._attr_state_class = state_class
         self._attr_native_unit_of_measurement = unit_of_measurement
@@ -108,6 +109,7 @@ class CocoroAirTemperatureSensor(CocoroAirSensorBase):
             SensorStateClass.MEASUREMENT,
             UnitOfTemperature.CELSIUS
         )
+        self._attr_icon = "mdi:thermometer"
 
 
 class CocoroAirHumiditySensor(CocoroAirSensorBase):
@@ -122,3 +124,4 @@ class CocoroAirHumiditySensor(CocoroAirSensorBase):
             SensorStateClass.MEASUREMENT,
             "%"
         )
+        self._attr_icon = "mdi:water-percent"

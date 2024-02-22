@@ -6,6 +6,6 @@
   "requirements": ["httpx==0.26.0"],
   "dependencies": [],
   "codeowners": ["@hldh214"],
-  "version": "0.1.0",
+  "version": "0.2.0",
   "config_flow": false
 }

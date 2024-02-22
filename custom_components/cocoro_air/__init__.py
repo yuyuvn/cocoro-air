@@ -28,10 +28,10 @@ async def async_setup(hass, config):
     password = config[DOMAIN]["password"]
     device_id = config[DOMAIN]["device_id"]
 
-    cocoro_air = CocoroAir(email, password, device_id)
+    cocoro_air_api = CocoroAir(email, password, device_id)
 
     hass.data[DOMAIN] = {
-        "cocoro_air": cocoro_air,
+        "cocoro_air_api": cocoro_air_api,
     }
 
     await discovery.async_load_platform(hass, Platform.SENSOR, DOMAIN, {}, config)
