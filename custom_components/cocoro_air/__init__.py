@@ -2,30 +2,49 @@ import logging
 
 import httpx
 
+import voluptuous as vol
+
+from homeassistant.helpers import config_validation, discovery
+
+from homeassistant.const import Platform
+
 DOMAIN = "cocoro_air"
 
 _LOGGER = logging.getLogger(__name__)
 
+CONFIG_SCHEMA = vol.Schema({
+    DOMAIN: vol.Schema({
+        vol.Required("email"): config_validation.string,
+        vol.Required("password"): config_validation.string,
+        vol.Required("device_id"): config_validation.string,
+    })
+}, extra=vol.ALLOW_EXTRA)
+
 
 async def async_setup(hass, config):
     _LOGGER.debug("Setting up Cocoro Air component.")
-    cocoromembers_cookie_str = config[DOMAIN]["cocoromembers_cookie_str"]
+
+    email = config[DOMAIN]["email"]
+    password = config[DOMAIN]["password"]
     device_id = config[DOMAIN]["device_id"]
 
-    cocoro_air = CocoroAir(cocoromembers_cookie_str, device_id)
+    cocoro_air = CocoroAir(email, password, device_id)
 
     hass.data[DOMAIN] = {
         "cocoro_air": cocoro_air,
     }
+
+    await discovery.async_load_platform(hass, Platform.SENSOR, DOMAIN, {}, config)
 
     # Return boolean to indicate that initialization was successful.
     return True
 
 
 class CocoroAir:
-    def __init__(self, cocoromembers_cookie_str, device_id):
+    def __init__(self, email, password, device_id):
         self.opener = httpx.Client()
-        self.cocoromembers_cookie_str = cocoromembers_cookie_str
+        self.email = email
+        self.password = password
         self.device_id = device_id
 
     def login(self):
@@ -33,11 +52,20 @@ class CocoroAir:
 
         redirect_url = res.json()['redirectUrl']
 
-        res = self.opener.get(redirect_url, headers={
-            'Cookie': self.cocoromembers_cookie_str,
+        res = self.opener.get(redirect_url, follow_redirects=True)
+
+        assert res.url.path == '/sic-front/sso/ExLoginViewAction.do'
+
+        res = self.opener.post('https://cocoromembers.jp.sharp/sic-front/sso/A050101ExLoginAction.do', data={
+            'memberId': self.email,
+            'password': self.password,
+            'captchaText': '1',
+            'autoLogin': 'on',
+            'exsiteId': '50130',
         }, follow_redirects=True)
 
         assert res.status_code == 200
+        assert b'login=success' in res.url.query
 
         _LOGGER.info('Login success')
 

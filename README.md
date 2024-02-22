@@ -27,6 +27,7 @@ https://hacs.xyz/docs/faq/custom_repositories
 
 ```yaml
 cocoro_air:
+  email: YOUR_EMAIL
+  password: YOUR_PASSWORD
   device_id: YOUR_DEVICE_ID
-  cocoromembers_cookie_str: YOUR_COOKIE
 ```
