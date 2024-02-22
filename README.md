@@ -23,7 +23,8 @@ https://hacs.xyz/docs/faq/custom_repositories
 
 1. Go to https://cocoroplusapp.jp.sharp/air and sign in/up
 2. Get `device_id` from devtools
-3. Get Cookie for https://cocoromembers.jp.sharp/ from devtools
+3. Add following codes to your `configuration.yaml` file
+4. Restart Home Assistant
 
 ```yaml
 cocoro_air:
