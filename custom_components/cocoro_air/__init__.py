@@ -82,7 +82,12 @@ class CocoroAir:
             return self.get_sensor_data()
 
         _LOGGER.debug(f'cocoro-air response: {res.text}')
-        k1_data = res.json()['objects_aircleaner_020']['body']['data'][0]['k1']
+
+        try:
+            k1_data = res.json()['objects_aircleaner_020']['body']['data'][0]['k1']
+        except KeyError:
+            _LOGGER.error(f'Failed to get sensor data, cocoro-air response: {res.text}')
+            return None
 
         temperature = int(k1_data['s1'], 16)
         humidity = int(k1_data['s2'], 16)
