@@ -66,7 +66,6 @@ class CocoroAir:
         }, follow_redirects=True)
 
         assert res.status_code == 200
-        assert b'login=success' in res.url.query
 
         _LOGGER.info('Login success')
 
