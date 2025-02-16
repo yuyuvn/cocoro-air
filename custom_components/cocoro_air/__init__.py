@@ -124,7 +124,7 @@ class CocoroAir:
                 'deviceToken': self.device_id,
                 'event_key': 'echonet_control',
                 'data': [
-                    {opc: "k3", odt: {s5: "00", s7: mode_value}}
+                    {'opc': "k3", 'odt': {'s5': "00", 's7': mode_value}}
                 ]
             }
         )
@@ -152,7 +152,7 @@ class CocoroAir:
             params={
                 'device_id': self.device_id,
                 'event_key': 'echonet_property',
-                'opc': 'k3',
+                'opc': 'k1+k2+k3',
             }
         )
 
