@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import httpx
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -75,4 +76,4 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth.""" 
+    """Error to indicate there is invalid auth."""
