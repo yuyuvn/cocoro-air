@@ -20,6 +20,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required("email"): str,
         vol.Required("password"): str,
         vol.Required("device_id"): str,
+        vol.Required("model_name", default="KILS50"): str,
     }
 )
 
@@ -31,6 +32,7 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
         data["email"],
         data["password"],
         data["device_id"],
+        data["model_name"],
     )
 
     try:
@@ -39,7 +41,7 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
         raise InvalidAuth from err
 
     # Return info to be stored in the config entry.
-    return {"title": f"Cocoro Air ({data['device_id']})"}
+    return {"title": f"Cocoro Air {data['model_name']} ({data['device_id']})"}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
