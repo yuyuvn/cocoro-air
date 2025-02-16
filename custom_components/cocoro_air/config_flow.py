@@ -20,19 +20,17 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required("email"): str,
         vol.Required("password"): str,
         vol.Required("device_id"): str,
-        vol.Required("device_token"): str,
     }
 )
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
+def validate_input(data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
 
     api = CocoroAir(
         data["email"],
         data["password"],
         data["device_id"],
-        data["device_token"],
     )
 
     try:
@@ -58,7 +56,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await self.hass.async_add_executor_job(
-                    validate_input, self.hass, user_input
+                    validate_input, user_input
                 )
                 return self.async_create_entry(title=info["title"], data=user_input)
             except InvalidAuth:

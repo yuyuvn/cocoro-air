@@ -19,7 +19,6 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Required("email"): config_validation.string,
         vol.Required("password"): config_validation.string,
         vol.Required("device_id"): config_validation.string,
-        vol.Required("device_token"): config_validation.string,
     })
 }, extra=vol.ALLOW_EXTRA)
 
@@ -30,9 +29,8 @@ async def async_setup(hass, config):
     email = config[DOMAIN]["email"]
     password = config[DOMAIN]["password"]
     device_id = config[DOMAIN]["device_id"]
-    device_id = config[DOMAIN]["device_token"]
 
-    cocoro_air_api = CocoroAir(email, password, device_id, device_token)
+    cocoro_air_api = CocoroAir(email, password, device_id)
 
     hass.data[DOMAIN] = {
         "cocoro_air_api": cocoro_air_api,
@@ -53,7 +51,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data["email"],
         entry.data["password"],
         entry.data["device_id"],
-        entry.data["device_token"],
     )
 
     hass.data[DOMAIN][entry.entry_id] = {
@@ -78,12 +75,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 class CocoroAir:
-    def __init__(self, email, password, device_id, device_token):
+    def __init__(self, email, password, device_id):
         self.opener = httpx.Client()
         self.email = email
         self.password = password
         self.device_id = device_id
-        self.device_token = device_token
 
     def login(self):
         res = self.opener.get('https://cocoroplusapp.jp.sharp/v1/cocoro-air/login')
@@ -149,7 +145,7 @@ class CocoroAir:
         res = self.opener.post(
             'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sync/air-cleaner',
             json={
-                'deviceToken': self.device_token,
+                'deviceToken': self.device_id,
                 'event_key': 'echonet_control',
                 'opc': 'b0',
                 'data': [
