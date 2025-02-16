@@ -186,7 +186,7 @@ class CocoroAir:
                 if k3_data is None:
                     raise KeyError("Could not find k3 field in response data")
                 mode_value = k3_data['s7']
-                return mode_value == 'FF'
+                return mode_value == 'ff'
             except (KeyError, IndexError) as e:
                 _LOGGER.error(f'Failed to get humidity mode status: {e}, response: {res.text}')
                 return None
