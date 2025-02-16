@@ -17,20 +17,29 @@ PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Cocoro Air from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+    
+    _LOGGER.debug("Setting up entry: %s", entry.as_dict())
+    
+    try:
+        cocoro_air_api = CocoroAir(
+            entry.data["email"],
+            entry.data["password"],
+            entry.data["device_id"],
+        )
+        
+        # Test the connection
+        await hass.async_add_executor_job(cocoro_air_api.login)
+        
+        hass.data[DOMAIN][entry.entry_id] = {
+            "cocoro_air_api": cocoro_air_api,
+        }
 
-    cocoro_air_api = CocoroAir(
-        entry.data["email"],
-        entry.data["password"],
-        entry.data["device_id"],
-    )
-
-    hass.data[DOMAIN][entry.entry_id] = {
-        "cocoro_air_api": cocoro_air_api,
-    }
-
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    return True
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        return True
+        
+    except Exception as ex:
+        _LOGGER.error("Error setting up entry: %s", ex)
+        raise
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -66,6 +75,7 @@ class CocoroAir:
         }, follow_redirects=True)
 
         assert res.status_code == 200
+        assert b'login=success' in res.url.query
 
         _LOGGER.info('Login success')
 
