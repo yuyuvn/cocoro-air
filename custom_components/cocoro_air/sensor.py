@@ -47,7 +47,7 @@ class CocoroAirTemperatureSensor(SensorEntity):
 
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        data = await self.hass.async_add_executor_job(self._api.get_sensor_data)
+        data = await self._api.get_sensor_data()
         if data:
             self._attr_native_value = data["temperature"]
 
@@ -69,6 +69,6 @@ class CocoroAirHumiditySensor(SensorEntity):
 
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        data = await self.hass.async_add_executor_job(self._api.get_sensor_data)
+        data = await self._api.get_sensor_data()
         if data:
             self._attr_native_value = data["humidity"]
