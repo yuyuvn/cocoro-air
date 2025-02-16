@@ -165,7 +165,14 @@ class CocoroAir:
         _LOGGER.debug(f'Get humidity mode response: {res.text}')
 
         try:
-            k3_data = res.json()['objects_aircleaner_020']['body']['data'][0]['k3']
+            data = res.json()['objects_aircleaner_020']['body']['data']
+            k3_data = None
+            for item in data:
+                if 'k3' in item:
+                    k3_data = item['k3']
+                    break
+            if k3_data is None:
+                raise KeyError("Could not find k3 field in response data")
             mode_value = k3_data['s7']
             return mode_value == 'FF'
         except (KeyError, IndexError) as e:
