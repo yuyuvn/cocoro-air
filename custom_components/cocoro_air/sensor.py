@@ -10,8 +10,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+import logging
 
 from . import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -20,7 +23,21 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Cocoro Air sensor platform."""
+    _LOGGER.debug("Setting up sensor platform with entry: %s", entry.as_dict())
+    
+    if DOMAIN not in hass.data:
+        _LOGGER.error("Domain data not found")
+        return
+        
+    if entry.entry_id not in hass.data[DOMAIN]:
+        _LOGGER.error("Entry ID not found in domain data")
+        return
+        
     cocoro_air_api = hass.data[DOMAIN][entry.entry_id]["cocoro_air_api"]
+    
+    if not cocoro_air_api:
+        _LOGGER.error("API instance not found")
+        return
 
     async_add_entities(
         [
@@ -46,7 +63,7 @@ class CocoroAirTemperatureSensor(SensorEntity):
 
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        data = await self.hass.async_add_executor_job(self._api.get_sensor_data)
+        data = await self._api.get_sensor_data()
         if data:
             self._attr_native_value = data["temperature"]
 
@@ -67,6 +84,6 @@ class CocoroAirHumiditySensor(SensorEntity):
 
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        data = await self.hass.async_add_executor_job(self._api.get_sensor_data)
+        data = await self._api.get_sensor_data()
         if data:
             self._attr_native_value = data["humidity"]

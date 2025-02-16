@@ -10,6 +10,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import DOMAIN, CocoroAir
 
@@ -24,22 +25,28 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
-def validate_input(data: dict[str, Any]) -> dict[str, Any]:
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
+    _LOGGER.debug("Validating input: %s", data)
 
+    session = async_get_clientsession(hass)
     api = CocoroAir(
+        session,
         data["email"],
         data["password"],
         data["device_id"],
     )
 
     try:
-        api.login()
+        await api.login()
     except Exception as err:
+        _LOGGER.error("Validation error: %s", err)
         raise InvalidAuth from err
 
-    # Return info to be stored in the config entry.
-    return {"title": f"Cocoro Air ({data['device_id']})"}
+    return {
+        "title": f"Cocoro Air ({data['device_id']})",
+        "data": data,
+    }
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -55,10 +62,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                info = await self.hass.async_add_executor_job(
-                    validate_input, user_input
+                info = await validate_input(self.hass, user_input)
+                _LOGGER.debug("Creating entry with data: %s", user_input)
+                return self.async_create_entry(
+                    title=info["title"],
+                    data=user_input
                 )
-                return self.async_create_entry(title=info["title"], data=user_input)
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
             except Exception:  # pylint: disable=broad-except

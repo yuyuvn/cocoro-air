@@ -42,19 +42,19 @@ class CocoroAirHumiditySwitch(SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         """Turn the humidity mode on."""
-        await self.hass.async_add_executor_job(self._api.set_humidity_mode, 'on')
+        await self._api.set_humidity_mode('on')
         self._attr_is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         """Turn the humidity mode off."""
-        await self.hass.async_add_executor_job(self._api.set_humidity_mode, 'off')
+        await self._api.set_humidity_mode('off')
         self._attr_is_on = False
         self.async_write_ha_state()
 
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     async def async_update(self):
         """Fetch new state data for the sensor."""
-        state = await self.hass.async_add_executor_job(self._api.get_humidity_mode)
+        state = await self._api.get_humidity_mode()
         if state is not None:
-            self._attr_is_on = state 
+            self._attr_is_on = state
