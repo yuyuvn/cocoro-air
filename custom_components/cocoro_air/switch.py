@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.util import Throttle
+from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
 
@@ -15,16 +16,15 @@ _LOGGER = logging.getLogger(__name__)
 MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=60)
 
 
-async def async_setup_platform(
+async def async_setup_entry(
     hass: HomeAssistant,
-    config: ConfigType,
-    add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Cocoro Air Switch platform."""
-    cocoro_air_api = hass.data[DOMAIN]["cocoro_air_api"]
+    cocoro_air_api = hass.data[DOMAIN][config_entry.entry_id]["cocoro_air_api"]
     
-    add_entities([
+    async_add_entities([
         CocoroAirHumiditySwitch(cocoro_air_api),
     ])
 

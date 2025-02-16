@@ -31,4 +31,5 @@ cocoro_air:
   email: YOUR_EMAIL
   password: YOUR_PASSWORD
   device_id: YOUR_DEVICE_ID
+  device_token: YOUR_DEVICE_TOKEN
 ```

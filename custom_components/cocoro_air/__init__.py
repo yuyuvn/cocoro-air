@@ -7,6 +7,8 @@ import voluptuous as vol
 from homeassistant.helpers import config_validation, discovery
 
 from homeassistant.const import Platform
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 
 DOMAIN = "cocoro_air"
 
@@ -41,6 +43,38 @@ async def async_setup(hass, config):
 
     # Return boolean to indicate that initialization was successful.
     return True
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up Cocoro Air from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+
+    cocoro_air_api = CocoroAir(
+        entry.data["email"],
+        entry.data["password"],
+        entry.data["device_id"],
+        entry.data["device_token"],
+    )
+
+    hass.data[DOMAIN][entry.entry_id] = {
+        "cocoro_air_api": cocoro_air_api,
+    }
+
+    await hass.config_entries.async_forward_entry_setups(
+        entry, [Platform.SENSOR, Platform.SWITCH]
+    )
+
+    return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    if unload_ok := await hass.config_entries.async_unload_platforms(
+        entry, [Platform.SENSOR, Platform.SWITCH]
+    ):
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok
 
 
 class CocoroAir:
