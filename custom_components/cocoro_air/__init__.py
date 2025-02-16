@@ -1,46 +1,17 @@
+"""The Cocoro Air integration."""
 import logging
 
 import httpx
 
-import voluptuous as vol
-
-from homeassistant.helpers import config_validation, discovery
-
-from homeassistant.const import Platform
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 DOMAIN = "cocoro_air"
 
 _LOGGER = logging.getLogger(__name__)
 
-CONFIG_SCHEMA = vol.Schema({
-    DOMAIN: vol.Schema({
-        vol.Required("email"): config_validation.string,
-        vol.Required("password"): config_validation.string,
-        vol.Required("device_id"): config_validation.string,
-    })
-}, extra=vol.ALLOW_EXTRA)
-
-
-async def async_setup(hass, config):
-    _LOGGER.debug("Setting up Cocoro Air component.")
-
-    email = config[DOMAIN]["email"]
-    password = config[DOMAIN]["password"]
-    device_id = config[DOMAIN]["device_id"]
-
-    cocoro_air_api = CocoroAir(email, password, device_id)
-
-    hass.data[DOMAIN] = {
-        "cocoro_air_api": cocoro_air_api,
-    }
-
-    await discovery.async_load_platform(hass, Platform.SENSOR, DOMAIN, {}, config)
-    await discovery.async_load_platform(hass, Platform.SWITCH, DOMAIN, {}, config)
-
-    # Return boolean to indicate that initialization was successful.
-    return True
+PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -57,18 +28,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "cocoro_air_api": cocoro_air_api,
     }
 
-    await hass.config_entries.async_forward_entry_setups(
-        entry, [Platform.SENSOR, Platform.SWITCH]
-    )
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(
-        entry, [Platform.SENSOR, Platform.SWITCH]
-    ):
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
