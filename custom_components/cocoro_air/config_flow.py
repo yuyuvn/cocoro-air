@@ -28,7 +28,9 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 def validate_input(data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
 
+    client = httpx.Client()
     api = CocoroAir(
+        client,
         data["email"],
         data["password"],
         data["device_id"],

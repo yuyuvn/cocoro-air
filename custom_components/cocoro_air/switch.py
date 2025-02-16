@@ -34,11 +34,17 @@ class CocoroAirHumiditySwitch(SwitchEntity):
 
     _attr_name = "Cocoro Air Humidity Mode"
     _attr_unique_id = "cocoro_air_humidity_mode"
+    _attr_icon = "mdi:air-humidifier"
     
     def __init__(self, api):
         """Initialize the switch."""
         self._api = api
         self._attr_is_on = False
+
+    @property
+    def icon(self):
+        """Return the icon to use in the frontend."""
+        return "mdi:air-humidifier-off" if not self._attr_is_on else "mdi:air-humidifier"
 
     async def async_turn_on(self, **kwargs):
         """Turn the humidity mode on."""

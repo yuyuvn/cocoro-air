@@ -38,6 +38,7 @@ class CocoroAirTemperatureSensor(SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_name = "Cocoro Air Temperature"
     _attr_unique_id = "cocoro_air_temperature"
+    _attr_icon = "mdi:thermometer"
 
     def __init__(self, api):
         """Initialize the sensor."""
@@ -59,6 +60,7 @@ class CocoroAirHumiditySensor(SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_name = "Cocoro Air Humidity"
     _attr_unique_id = "cocoro_air_humidity"
+    _attr_icon = "mdi:water-percent"
 
     def __init__(self, api):
         """Initialize the sensor."""
