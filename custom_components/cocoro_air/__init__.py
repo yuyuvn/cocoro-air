@@ -123,7 +123,6 @@ class CocoroAir:
             json={
                 'deviceToken': self.device_id,
                 'event_key': 'echonet_control',
-                'opc': 'b0',
                 'data': [
                     {opc: "k3", odt: {s5: "00", s7: mode_value}}
                 ]
