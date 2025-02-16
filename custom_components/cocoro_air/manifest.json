@@ -2,13 +2,13 @@
   "domain": "cocoro_air",
   "name": "Cocoro Air",
   "config_flow": true,
-  "documentation": "https://github.com/yourusername/ha-cocoro-air",
+  "documentation": "https://github.com/yuyuvn/cocoro-air",
   "requirements": ["httpx"],
   "ssdp": [],
   "zeroconf": [],
   "homekit": {},
   "dependencies": [],
-  "codeowners": ["@yourusername"],
+  "codeowners": ["@yuyuvn"],
   "iot_class": "cloud_polling",
   "version": "1.0.0"
 }
