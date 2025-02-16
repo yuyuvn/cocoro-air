@@ -36,13 +36,15 @@ class CocoroAirTemperatureSensor(SensorEntity):
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_name = "Cocoro Air Temperature"
-    _attr_unique_id = "cocoro_air_temperature"
+    _attr_has_entity_name = True
+    _attr_name = "Temperature"
     _attr_icon = "mdi:thermometer"
 
     def __init__(self, api):
         """Initialize the sensor."""
         self._api = api
+        self._attr_unique_id = f"{api.device_id}_temperature"
+        self._attr_device_info = api.device_info
         self._attr_native_value = None
 
     async def async_update(self) -> None:
@@ -58,13 +60,15 @@ class CocoroAirHumiditySensor(SensorEntity):
     _attr_device_class = SensorDeviceClass.HUMIDITY
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_name = "Cocoro Air Humidity"
-    _attr_unique_id = "cocoro_air_humidity"
+    _attr_has_entity_name = True
+    _attr_name = "Humidity"
     _attr_icon = "mdi:water-percent"
 
     def __init__(self, api):
         """Initialize the sensor."""
         self._api = api
+        self._attr_unique_id = f"{api.device_id}_humidity"
+        self._attr_device_info = api.device_info
         self._attr_native_value = None
 
     async def async_update(self) -> None:

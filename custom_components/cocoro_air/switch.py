@@ -32,13 +32,15 @@ async def async_setup_entry(
 class CocoroAirHumiditySwitch(SwitchEntity):
     """Representation of a Cocoro Air Humidity Switch."""
 
-    _attr_name = "Cocoro Air Humidity Mode"
-    _attr_unique_id = "cocoro_air_humidity_mode"
+    _attr_has_entity_name = True
+    _attr_name = "Humidity Mode"
     _attr_icon = "mdi:air-humidifier"
     
     def __init__(self, api):
         """Initialize the switch."""
         self._api = api
+        self._attr_unique_id = f"{api.device_id}_humidity_mode"
+        self._attr_device_info = api.device_info
         self._attr_is_on = False
 
     @property

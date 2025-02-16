@@ -5,6 +5,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.helpers.device_registry import DeviceInfo
 
 DOMAIN = "cocoro_air"
 
@@ -62,6 +63,13 @@ class CocoroAir:
         self.password = password
         self.device_id = device_id
         self.model_name = model_name
+        
+        self.device_info = DeviceInfo(
+            identifiers={(DOMAIN, device_id)},
+            name=f"Cocoro Air {model_name}",
+            manufacturer="Sharp",
+            model=model_name,
+        )
 
     async def login(self):
         """Login to Cocoro Air."""
