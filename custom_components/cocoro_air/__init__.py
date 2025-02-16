@@ -121,11 +121,13 @@ class CocoroAir:
         res = self.opener.post(
             'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sync/air-cleaner',
             json={
+                'additional_request': False,
                 'deviceToken': self.device_id,
                 'event_key': 'echonet_control',
                 'data': [
                     {'opc': "k3", 'odt': {'s5': "00", 's7': mode_value}}
-                ]
+                ],
+                'model_name': 'KILS50',
             }
         )
 
@@ -152,7 +154,9 @@ class CocoroAir:
             params={
                 'device_id': self.device_id,
                 'event_key': 'echonet_property',
+                'epc': '0x80+0x86',
                 'opc': 'k1+k2+k3',
+                'count': '1',
             }
         )
 
