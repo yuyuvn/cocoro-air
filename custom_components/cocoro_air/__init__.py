@@ -171,8 +171,7 @@ class CocoroAir:
                 params={
                     'device_id': self.device_id,
                     'event_key': 'echonet_property',
-                    'epc': '0x80+0x86',
-                    'opc': 'k1+k2+k3',
+                    'opc': 'k3',
                     'count': '1',
                 }
             )
