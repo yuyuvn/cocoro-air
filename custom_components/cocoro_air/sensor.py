@@ -13,7 +13,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import DOMAIN
 
-
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,

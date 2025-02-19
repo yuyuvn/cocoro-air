@@ -12,7 +12,7 @@ DOMAIN = "cocoro_air"
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.SWITCH]
-
+MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=1)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Cocoro Air from a config entry."""
@@ -78,11 +78,12 @@ class CocoroAir:
             redirect_url = res.json()['redirectUrl']
 
             res = await client.get(redirect_url, follow_redirects=True)
-            assert str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do')
+            assert str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do') or str(res.url).startswith('https://cocoroplusapp.jp.sharp/air')
 
-            res = await client.post(
-                'https://cocoromembers.jp.sharp/sic-front/sso/A050101ExLoginAction.do',
-                data={
+            if str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do'):
+                res = await client.post(
+                    'https://cocoromembers.jp.sharp/sic-front/sso/A050101ExLoginAction.do',
+                    data={
                     'memberId': self.email,
                     'password': self.password,
                     'captchaText': '1',
@@ -90,13 +91,13 @@ class CocoroAir:
                     'exsiteId': '50130',
                 },
                 follow_redirects=True
-            )
-
-            assert res.status_code == 200
-            assert b'login=success' in str(res.url).encode()
+                )
+                assert res.status_code == 200
+                assert b'login=success' in str(res.url).encode()
 
             _LOGGER.info('Login success')
 
+    @Throttle(MIN_TIME_BETWEEN_UPDATES)
     async def get_sensor_data(self):
         """Get sensor data from Cocoro Air."""
         async with self.client as client:
