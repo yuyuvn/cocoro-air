@@ -7,6 +7,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.util import Throttle
 
 DOMAIN = "cocoro_air"
 
