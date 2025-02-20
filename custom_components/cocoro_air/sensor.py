@@ -1,6 +1,7 @@
 """Sensor platform for Cocoro Air."""
 from __future__ import annotations
 
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
