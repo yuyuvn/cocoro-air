@@ -13,9 +13,6 @@ from . import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=5)
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -48,6 +45,15 @@ class CocoroAirHumidifier(HumidifierEntity):
     def icon(self):
         """Return the icon to use in the frontend."""
         return "mdi:air-humidifier-off" if not self._attr_is_on else "mdi:air-humidifier"
+    
+    @property
+    def is_on(self):
+        """Return the state of the humidifier."""
+        try:
+            data = self._api.get_sensor_data()
+            return data['humidity_mode']
+        except (KeyError, TypeError):
+            return None
 
     async def async_update(self):
         """Fetch new state data for the sensor."""
@@ -55,8 +61,15 @@ class CocoroAirHumidifier(HumidifierEntity):
             await self._api.update()
         except Exception as e:
             _LOGGER.warning("Failed to update sensor data: %s", e)
-        try:
-            data = self._api.get_sensor_data()
-            self._attr_is_on = data['humidity_mode']
-        except KeyError:
-            self._attr_is_on = None
+    
+    async def async_turn_on(self, **kwargs):
+        """Turn the humidifier on."""
+        await self._api.set_humidity_mode('on')
+        self._attr_is_on = True
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs):
+        """Turn the humidifier off."""
+        await self._api.set_humidity_mode('off')
+        self._attr_is_on = False
+        self.async_write_ha_state()
