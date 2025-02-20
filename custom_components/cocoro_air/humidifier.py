@@ -49,15 +49,14 @@ class CocoroAirHumidifier(HumidifierEntity):
         """Return the icon to use in the frontend."""
         return "mdi:air-humidifier-off" if not self._attr_is_on else "mdi:air-humidifier"
 
-    @property
-    def _attr_is_on(self):
-        """Return the state of the resources."""
-        try:
-            data = self._api.get_sensor_data()
-            return data['humidity_mode']
-        except KeyError:
-            return None
-
     async def async_update(self):
         """Fetch new state data for the sensor."""
-        await self._api.update()
+        try:
+            await self._api.update()
+        except Exception as e:
+            _LOGGER.warning("Failed to update sensor data: %s", e)
+        try:
+            data = self._api.get_sensor_data()
+            self._attr_is_on = data['humidity_mode']
+        except KeyError:
+            self._attr_is_on = None
