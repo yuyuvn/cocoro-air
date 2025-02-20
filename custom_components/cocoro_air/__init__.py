@@ -39,7 +39,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "cocoro_air_api": cocoro_air_api,
         }
 
-        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        # Load platforms one at a time to avoid blocking imports
+        for platform in PLATFORMS:
+            hass.async_create_task(
+                hass.config_entries.async_forward_entry_setup(entry, platform)
+            )
         return True
         
     except Exception as ex:

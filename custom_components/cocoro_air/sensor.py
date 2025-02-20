@@ -14,6 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import DOMAIN
 
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -22,13 +23,12 @@ async def async_setup_entry(
     """Set up Cocoro Air sensor platform."""
     cocoro_air_api = hass.data[DOMAIN][entry.entry_id]["cocoro_air_api"]
 
-    async_add_entities(
-        [
-            CocoroAirTemperatureSensor(cocoro_air_api),
-            CocoroAirHumiditySensor(cocoro_air_api),
-            CocoroAirWaterTankSensor(cocoro_air_api),
-        ]
-    )
+    entities = [
+        CocoroAirTemperatureSensor(cocoro_air_api),
+        CocoroAirHumiditySensor(cocoro_air_api),
+        CocoroAirWaterTankSensor(cocoro_air_api),
+    ]
+    async_add_entities(entities)
 
 
 class CocoroAirTemperatureSensor(SensorEntity):
@@ -46,19 +46,19 @@ class CocoroAirTemperatureSensor(SensorEntity):
         self._api = api
         self._attr_unique_id = f"{api.device_id}_temperature"
         self._attr_device_info = api.device_info
-
-    @property
-    def _attr_native_value(self):
-        """Return the state of the resources."""
-        try:
-            data = self._api.get_sensor_data()
-            return data['temperature']
-        except KeyError:
-            return None
+        self._attr_native_value = None
 
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        await self._api.update()
+        try:
+            await self._api.update()
+        except Exception as e:
+            _LOGGER.warning("Failed to update sensor data: %s", e)
+        try:
+            data = self._api.get_sensor_data()
+            self._attr_native_value = data['temperature']
+        except KeyError:
+            self._attr_native_value = None
 
 
 class CocoroAirHumiditySensor(SensorEntity):
@@ -76,19 +76,20 @@ class CocoroAirHumiditySensor(SensorEntity):
         self._api = api
         self._attr_unique_id = f"{api.device_id}_humidity"
         self._attr_device_info = api.device_info
+        self._attr_native_value = None
     
-    @property
-    def _attr_native_value(self):
-        """Return the state of the resources."""
-        try:
-            data = self._api.get_sensor_data()
-            return data['humidity']
-        except KeyError:
-            return None
-
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        await self._api.update()
+        try:
+            await self._api.update()
+        except Exception as e:
+            _LOGGER.warning("Failed to update sensor data: %s", e)
+        try:
+            data = self._api.get_sensor_data()
+            self._attr_native_value = data['humidity']
+        except KeyError:
+            self._attr_native_value = None
+
 
 class CocoroAirWaterTankSensor(BinarySensorEntity):
     """Representation of a Cocoro Air Water Tank Sensor."""
@@ -103,16 +104,16 @@ class CocoroAirWaterTankSensor(BinarySensorEntity):
         self._api = api
         self._attr_unique_id = f"{api.device_id}_water_tank"
         self._attr_device_info = api.device_info
-    
-    @property
-    def _attr_is_on(self):
-        """Return the state of the resources."""
-        try:
-            data = self._api.get_sensor_data()
-            return data['water_tank']
-        except KeyError:
-            return None
+        self._attr_is_on = None
 
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        await self._api.update()
+        try:
+            await self._api.update()
+        except Exception as e:
+            _LOGGER.warning("Failed to update sensor data: %s", e)
+        try:
+            data = self._api.get_sensor_data()
+            self._attr_is_on = data['water_tank']
+        except KeyError:
+            self._attr_is_on = None
