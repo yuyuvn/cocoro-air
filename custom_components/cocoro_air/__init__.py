@@ -126,20 +126,22 @@ class CocoroAir:
 
             _LOGGER.debug(f'cocoro-air response: {res.text}')
 
+            response_data = self.cache
             try:
                 data = res.json()['objects_aircleaner_020']['body']['data']
                 for item in data:
                     if 'k1' in item:
-                        self.cache['k1'] = item['k1']
+                        response_data['k1'] = item['k1']
                     if 'k2' in item:
-                        self.cache['k2'] = item['k2']
+                        response_data['k2'] = item['k2']
                     if 'k3' in item:
-                        self.cache['k3'] = item['k3']
+                        response_data['k3'] = item['k3']
             except (KeyError, IndexError) as e:
                 _LOGGER.error(f'Failed to get data, response: {res.text}')
                 return None
 
-            return data
+            self.cache = response_data
+            return response_data
 
     def get_sensor_data(self, data=None, retried=False):
         """Get sensor data from Cocoro Air."""
