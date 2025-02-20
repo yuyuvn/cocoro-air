@@ -49,21 +49,15 @@ class CocoroAirHumidifier(HumidifierEntity):
         """Return the icon to use in the frontend."""
         return "mdi:air-humidifier-off" if not self._attr_is_on else "mdi:air-humidifier"
 
-    async def async_turn_on(self, **kwargs):
-        """Turn the humidifier on."""
-        await self._api.set_humidity_mode('on')
-        self._attr_is_on = True
-        self.async_write_ha_state()
+    @property
+    def _attr_is_on(self):
+        """Return the state of the resources."""
+        try:
+            data = self._api.get_sensor_data()
+            return data['humidity_mode']
+        except KeyError:
+            return None
 
-    async def async_turn_off(self, **kwargs):
-        """Turn the humidifier off."""
-        await self._api.set_humidity_mode('off')
-        self._attr_is_on = False
-        self.async_write_ha_state()
-
-    @Throttle(MIN_TIME_BETWEEN_UPDATES)
     async def async_update(self):
         """Fetch new state data for the sensor."""
-        state = await self._api.get_humidity_mode()
-        if state is not None:
-            self._attr_is_on = state
+        await self._api.update()

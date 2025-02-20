@@ -26,6 +26,7 @@ async def async_setup_entry(
         [
             CocoroAirTemperatureSensor(cocoro_air_api),
             CocoroAirHumiditySensor(cocoro_air_api),
+            CocoroAirWaterTankSensor(cocoro_air_api),
         ]
     )
 
@@ -45,13 +46,19 @@ class CocoroAirTemperatureSensor(SensorEntity):
         self._api = api
         self._attr_unique_id = f"{api.device_id}_temperature"
         self._attr_device_info = api.device_info
-        self._attr_native_value = None
+
+    @property
+    def _attr_native_value(self):
+        """Return the state of the resources."""
+        try:
+            data = self._api.get_sensor_data()
+            return data['temperature']
+        except KeyError:
+            return None
 
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        data = await self._api.get_sensor_data()
-        if data:
-            self._attr_native_value = data["temperature"]
+        await self._api.update()
 
 
 class CocoroAirHumiditySensor(SensorEntity):
@@ -69,13 +76,19 @@ class CocoroAirHumiditySensor(SensorEntity):
         self._api = api
         self._attr_unique_id = f"{api.device_id}_humidity"
         self._attr_device_info = api.device_info
-        self._attr_native_value = None
+    
+    @property
+    def _attr_native_value(self):
+        """Return the state of the resources."""
+        try:
+            data = self._api.get_sensor_data()
+            return data['humidity']
+        except KeyError:
+            return None
 
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        data = await self._api.get_sensor_data()
-        if data:
-            self._attr_native_value = data["humidity"]
+        await self._api.update()
 
 class CocoroAirWaterTankSensor(BinarySensorEntity):
     """Representation of a Cocoro Air Water Tank Sensor."""
@@ -90,10 +103,16 @@ class CocoroAirWaterTankSensor(BinarySensorEntity):
         self._api = api
         self._attr_unique_id = f"{api.device_id}_water_tank"
         self._attr_device_info = api.device_info
-        self._attr_is_on = None
+    
+    @property
+    def _attr_is_on(self):
+        """Return the state of the resources."""
+        try:
+            data = self._api.get_sensor_data()
+            return data['water_tank']
+        except KeyError:
+            return None
 
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
-        data = await self._api.get_sensor_data()
-        if data:
-            self._attr_is_on = data["water_tank"]
+        await self._api.update()

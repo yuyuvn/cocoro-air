@@ -58,6 +58,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class CocoroAir:
     """Cocoro Air API Client."""
 
+    _cache = None
+
     def __init__(self, client, email, password, device_id, model_name):
         """Initialize the API client."""
         self.client = client
@@ -65,7 +67,8 @@ class CocoroAir:
         self.password = password
         self.device_id = device_id
         self.model_name = model_name
-        
+        self.cache = {}
+
         self.device_info = DeviceInfo(
             identifiers={(DOMAIN, device_id)},
             name=f"Cocoro Air {model_name}",
@@ -98,74 +101,59 @@ class CocoroAir:
                 assert b'login=success' in str(res.url).encode()
 
             _LOGGER.info('Login success')
-
+    
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
-    async def get_sensor_data(self):
-        """Get sensor data from Cocoro Air."""
+    async def update(self, opc, retried=False):
+        """Call the API."""
         async with self.client as client:
             res = await client.get(
                 'https://cocoroplusapp.jp.sharp/v1/cocoro-air/objects-conceal/air-cleaner',
                 params={
                     'device_id': self.device_id,
                     'event_key': 'echonet_property',
-                    'opc': 'k1',
+                    'opc': 'k1+k2+k3',
                 }
             )
 
-            if res.status_code == 401:
+            if res.status_code == 401 and not retried:
                 _LOGGER.info('Login again')
                 await self.login()
-                return await self.get_sensor_data()
+                return await self.call_get_api(opc, True)
+            elif res.status_code == 401:
+                _LOGGER.error('Login failed')
+                return None
 
             _LOGGER.debug(f'cocoro-air response: {res.text}')
 
             try:
-                k1_data = res.json()['objects_aircleaner_020']['body']['data'][0]['k1']
-            except KeyError:
-                _LOGGER.error(f'Failed to get sensor data, cocoro-air response: {res.text}')
+                data = res.json()['objects_aircleaner_020']['body']['data']
+                for item in data:
+                    if 'k1' in item:
+                        self.cache['k1'] = item['k1']
+                    if 'k2' in item:
+                        self.cache['k2'] = item['k2']
+                    if 'k3' in item:
+                        self.cache['k3'] = item['k3']
+            except (KeyError, IndexError) as e:
+                _LOGGER.error(f'Failed to get data, response: {res.text}')
                 return None
 
-            temperature = int(k1_data['s1'], 16)
-            humidity = int(k1_data['s2'], 16)
-
-            return {
-                'temperature': temperature,
-                'humidity': humidity,
-            }
-
-    @Throttle(MIN_TIME_BETWEEN_UPDATES)
-    async def get_sensor_data2(self):
+    def get_sensor_data(self, retried=False):
         """Get sensor data from Cocoro Air."""
-        async with self.client as client:
-            res = await client.get(
-                'https://cocoroplusapp.jp.sharp/v1/cocoro-air/objects-conceal/air-cleaner',
-                params={
-                    'device_id': self.device_id,
-                    'event_key': 'echonet_property',
-                    'opc': 'k2',
-                }
-            )
+        
+        temperature = int(self.cache['k1']['s1'], 16) if self.cache.get('k1', {}).get('s1') else None
+        humidity = int(self.cache['k1']['s2'], 16) if self.cache.get('k1', {}).get('s2') else None
+        water_tank = self.cache.get('k2', {}).get('s6') == 'ff' if self.cache.get('k2', {}).get('s6') else None
+        humidity_mode = self.cache.get('k3', {}).get('s7') == 'ff' if self.cache.get('k3', {}).get('s7') else None
 
-            if res.status_code == 401:
-                _LOGGER.info('Login again')
-                await self.login()
-                return await self.get_sensor_data()
+        return {
+            'temperature': temperature,
+            'humidity': humidity,
+            'water_tank': water_tank,
+            'humidity_mode': humidity_mode,
+        }
 
-            _LOGGER.debug(f'cocoro-air response: {res.text}')
-
-            try:
-                k2_data = res.json()['objects_aircleaner_020']['body']['data'][0]['k2']
-            except KeyError:
-                _LOGGER.error(f'Failed to get sensor data, cocoro-air response: {res.text}')
-                return None
-
-            water_tank = k2_data['s6'] == 'ff'
-
-            return {
-                'water_tank': water_tank,
-            }
-
-    async def set_humidity_mode(self, mode):
+    async def set_humidity_mode(self, mode, retried=False):
         """Set the humidity mode of the air purifier."""
         if mode not in ['on', 'off']:
             raise ValueError("Mode must be either 'on' or 'off'")
@@ -186,49 +174,15 @@ class CocoroAir:
                 }
             )
 
-            if res.status_code == 401:
+            if res.status_code == 401 and not retried:
                 _LOGGER.info('Login again')
                 await self.login()
-                return await self.set_humidity_mode(mode)
+                return await self.set_humidity_mode(mode, True)
 
             if res.status_code != 200:
                 _LOGGER.error(f'Failed to set humidity mode, status code: {res.status_code}, response: {res.text}')
                 return False
 
             _LOGGER.debug(f'Set humidity mode response: {res.text}')
+            self._humidity_mode = mode
             return True
-
-    async def get_humidity_mode(self):
-        """Get the current humidity mode status."""
-        async with self.client as client:
-            res = await client.get(
-                'https://cocoroplusapp.jp.sharp/v1/cocoro-air/objects-conceal/air-cleaner',
-                params={
-                    'device_id': self.device_id,
-                    'event_key': 'echonet_property',
-                    'opc': 'k3',
-                    'count': '1',
-                }
-            )
-
-            if res.status_code == 401:
-                _LOGGER.info('Login again')
-                await self.login()
-                return await self.get_humidity_mode()
-
-            _LOGGER.debug(f'Get humidity mode response: {res.text}')
-
-            try:
-                data = res.json()['objects_aircleaner_020']['body']['data']
-                k3_data = None
-                for item in data:
-                    if 'k3' in item:
-                        k3_data = item['k3']
-                        break
-                if k3_data is None:
-                    raise KeyError("Could not find k3 field in response data")
-                mode_value = k3_data['s7']
-                return mode_value == 'ff'
-            except (KeyError, IndexError) as e:
-                _LOGGER.error(f'Failed to get humidity mode status: {e}, response: {res.text}')
-                return None
