@@ -107,7 +107,7 @@ class CocoroAir:
             _LOGGER.info('Login success')
     
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
-    async def update(self, opc, retried=False):
+    async def update(self, retried=False):
         """Call the API."""
         async with self.client as client:
             res = await client.get(
@@ -122,7 +122,7 @@ class CocoroAir:
             if res.status_code == 401 and not retried:
                 _LOGGER.info('Login again')
                 await self.login()
-                return await self.call_get_api(opc, True)
+                return await self.call_get_api(True)
             elif res.status_code == 401:
                 _LOGGER.error('Login failed')
                 return None
