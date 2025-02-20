@@ -42,7 +42,7 @@ class CocoroAirHumidifier(HumidifierEntity):
         self._api = api
         self._attr_unique_id = f"{api.device_id}_humidity_mode"
         self._attr_device_info = api.device_info
-        self._attr_is_on = False
+        self._attr_is_on = None
 
     @property
     def icon(self):
