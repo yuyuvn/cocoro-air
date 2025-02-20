@@ -185,5 +185,10 @@ class CocoroAir:
                 return False
 
             _LOGGER.debug(f'Set humidity mode response: {res.text}')
-            self._humidity_mode = mode
+            
+            if not self.cache:
+                self.cache = {}
+            if 'k3' not in self.cache:
+                self.cache['k3'] = {}
+            self.cache['k3']['s7'] = mode_value
             return True
