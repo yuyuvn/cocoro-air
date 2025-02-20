@@ -51,22 +51,14 @@ class CocoroAirTemperatureSensor(SensorEntity):
         self._attr_device_info = api.device_info
         self._attr_native_value = None
 
-    @property
-    def native_value(self):
-        """Return the state of the sensor."""
-        try:
-            data = self._api.get_sensor_data()
-            return data['temperature']
-        except (KeyError, TypeError):
-            return None
-
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
         try:
-            await self._api.update()
+            raw_data = await self._api.update()
+            data = self._api.get_sensor_data(raw_data)
+            self._attr_native_value = data['temperature']
         except Exception as e:
             _LOGGER.warning("Failed to update sensor data: %s", e)
-
 
 class CocoroAirHumiditySensor(SensorEntity):
     """Representation of a Cocoro Air Humidity Sensor."""
@@ -85,19 +77,12 @@ class CocoroAirHumiditySensor(SensorEntity):
         self._attr_device_info = api.device_info
         self._attr_native_value = None
 
-    @property
-    def native_value(self):
-        """Return the state of the sensor."""
-        try:
-            data = self._api.get_sensor_data()
-            return data['humidity']
-        except (KeyError, TypeError):
-            return None
-
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
         try:
-            await self._api.update()
+            raw_data = await self._api.update()
+            data = self._api.get_sensor_data(raw_data)
+            self._attr_native_value = data['humidity']
         except Exception as e:
             _LOGGER.warning("Failed to update sensor data: %s", e)
 
@@ -117,18 +102,11 @@ class CocoroAirWaterTankSensor(BinarySensorEntity):
         self._attr_device_info = api.device_info
         self._attr_is_on = None
 
-    @property
-    def is_on(self):
-        """Return the state of the sensor."""
-        try:
-            data = self._api.get_sensor_data()
-            return data['water_tank']
-        except (KeyError, TypeError):
-            return None
-
     async def async_update(self) -> None:
         """Fetch new state data for the sensor."""
         try:
-            await self._api.update()
+            raw_data = await self._api.update()
+            data = self._api.get_sensor_data(raw_data)
+            self._attr_is_on = data['water_tank']
         except Exception as e:
             _LOGGER.warning("Failed to update sensor data: %s", e)

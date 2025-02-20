@@ -14,7 +14,7 @@ DOMAIN = "cocoro_air"
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.HUMIDIFIER]
-MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=1)
+MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=20)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Cocoro Air from a config entry."""
@@ -139,13 +139,17 @@ class CocoroAir:
                 _LOGGER.error(f'Failed to get data, response: {res.text}')
                 return None
 
-    def get_sensor_data(self, retried=False):
+            return data
+
+    def get_sensor_data(self, data=None, retried=False):
         """Get sensor data from Cocoro Air."""
+        if data is None:
+            data = self.cache
         
-        temperature = int(self.cache['k1']['s1'], 16) if self.cache.get('k1', {}).get('s1') else None
-        humidity = int(self.cache['k1']['s2'], 16) if self.cache.get('k1', {}).get('s2') else None
-        water_tank = self.cache.get('k2', {}).get('s6') == 'ff' if self.cache.get('k2', {}).get('s6') else None
-        humidity_mode = self.cache.get('k3', {}).get('s7') == 'ff' if self.cache.get('k3', {}).get('s7') else None
+        temperature = int(data['k1']['s1'], 16) if data.get('k1', {}).get('s1') else None
+        humidity = int(data['k1']['s2'], 16) if data.get('k1', {}).get('s2') else None
+        water_tank = data.get('k2', {}).get('s6') == 'ff' if data.get('k2', {}).get('s6') else None
+        humidity_mode = data.get('k3', {}).get('s7') == 'ff' if data.get('k3', {}).get('s7') else None
 
         return {
             'temperature': temperature,
@@ -179,6 +183,9 @@ class CocoroAir:
                 _LOGGER.info('Login again')
                 await self.login()
                 return await self.set_humidity_mode(mode, True)
+            elif res.status_code == 401:
+                _LOGGER.error('Login failed')
+                return False
 
             if res.status_code != 200:
                 _LOGGER.error(f'Failed to set humidity mode, status code: {res.status_code}, response: {res.text}')
