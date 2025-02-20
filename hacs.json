@@ -2,5 +2,5 @@
   "name": "Cocoro Air",
   "render_readme": true,
   "domains": ["sensor", "switch"],
-  "iot_class": ["Cloud Polling", "Cloud Push"]
+  "iot_class": ["Cloud Polling"]
 }

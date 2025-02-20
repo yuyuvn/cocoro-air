@@ -133,6 +133,38 @@ class CocoroAir:
                 'humidity': humidity,
             }
 
+    @Throttle(MIN_TIME_BETWEEN_UPDATES)
+    async def get_sensor_data2(self):
+        """Get sensor data from Cocoro Air."""
+        async with self.client as client:
+            res = await client.get(
+                'https://cocoroplusapp.jp.sharp/v1/cocoro-air/objects-conceal/air-cleaner',
+                params={
+                    'device_id': self.device_id,
+                    'event_key': 'echonet_property',
+                    'opc': 'k2',
+                }
+            )
+
+            if res.status_code == 401:
+                _LOGGER.info('Login again')
+                await self.login()
+                return await self.get_sensor_data()
+
+            _LOGGER.debug(f'cocoro-air response: {res.text}')
+
+            try:
+                k2_data = res.json()['objects_aircleaner_020']['body']['data'][0]['k2']
+            except KeyError:
+                _LOGGER.error(f'Failed to get sensor data, cocoro-air response: {res.text}')
+                return None
+
+            water_tank = k2_data['s6'] == 'ff'
+
+            return {
+                'water_tank': water_tank,
+            }
+
     async def set_humidity_mode(self, mode):
         """Set the humidity mode of the air purifier."""
         if mode not in ['on', 'off']:

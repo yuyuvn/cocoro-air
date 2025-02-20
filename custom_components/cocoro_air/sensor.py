@@ -75,3 +75,24 @@ class CocoroAirHumiditySensor(SensorEntity):
         data = await self._api.get_sensor_data()
         if data:
             self._attr_native_value = data["humidity"]
+
+class CocoroAirWaterTankSensor(BinarySensorEntity):
+    """Representation of a Cocoro Air Water Tank Sensor."""
+
+    _attr_device_class = BinarySensorDeviceClass.MOISTURE
+    _attr_has_entity_name = True
+    _attr_name = "Water tank"
+    _attr_icon = "mdi:water"
+
+    def __init__(self, api):
+        """Initialize the sensor."""
+        self._api = api
+        self._attr_unique_id = f"{api.device_id}_water_tank"
+        self._attr_device_info = api.device_info
+        self._attr_is_on = None
+
+    async def async_update(self) -> None:
+        """Fetch new state data for the sensor."""
+        data = await self._api.get_sensor_data()
+        if data:
+            self._attr_is_on = data["water_tank"]
