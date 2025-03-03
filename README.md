@@ -1,3 +1,6 @@
+# Archived, pls try this fork: https://github.com/yuyuvn/cocoro-air
+
+
 # cocoro-air
 
 https://cocoroplusapp.jp.sharp/air
