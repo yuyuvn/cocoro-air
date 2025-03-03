@@ -3,7 +3,7 @@
   "name": "Cocoro Air",
   "documentation": "https://github.com/hldh214/cocoro-air",
   "issue_tracker": "https://github.com/hldh214/cocoro-air/issues",
-  "requirements": ["httpx==0.26.0"],
+  "requirements": ["httpx"],
   "dependencies": [],
   "codeowners": ["@hldh214"],
   "version": "0.2.0",
