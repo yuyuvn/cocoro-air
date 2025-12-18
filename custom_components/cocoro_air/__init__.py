@@ -1,12 +1,9 @@
 import logging
 
 import httpx
-
 import voluptuous as vol
-
-from homeassistant.helpers import config_validation, discovery
-
 from homeassistant.const import Platform
+from homeassistant.helpers import config_validation, discovery
 
 DOMAIN = "cocoro_air"
 
@@ -70,7 +67,7 @@ class CocoroAir:
         _LOGGER.info('Login success')
 
     def get_sensor_data(self):
-        res = self.opener.get(f'https://cocoroplusapp.jp.sharp/v1/cocoro-air/objects-conceal/air-cleaner', params={
+        res = self.opener.get(f'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sensors-conceal/air-cleaner', params={
             'device_id': self.device_id,
             'event_key': 'echonet_property',
             'opc': 'k1',
@@ -84,7 +81,7 @@ class CocoroAir:
         _LOGGER.debug(f'cocoro-air response: {res.text}')
 
         try:
-            k1_data = res.json()['objects_aircleaner_020']['body']['data'][0]['k1']
+            k1_data = res.json()['objects_aircleaner_021']['body']['data'][0]['k1']
         except KeyError:
             _LOGGER.error(f'Failed to get sensor data, cocoro-air response: {res.text}')
             return None
