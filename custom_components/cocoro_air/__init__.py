@@ -93,9 +93,3 @@ class CocoroAir:
             'temperature': temperature,
             'humidity': humidity,
         }
-
-if __name__ == '__main__':
-    cocoro_air = CocoroAir('hldh214@gmail.com', '***REMOVED***', '***REMOVED***')
-    cocoro_air.login()
-    data = cocoro_air.get_sensor_data()
-    print(data)
