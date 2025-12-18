@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Authentication",
+        "description": "Please enter your Cocoro Air credentials.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "device": {
+        "title": "Select Device",
+        "description": "Please select the device you want to control.",
+        "data": {
+          "device_id": "Device"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "no_devices_found": "No devices found"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  }
+}

@@ -1,6 +1,3 @@
-# Archived, pls try this fork: https://github.com/yuyuvn/cocoro-air
-
-
 # cocoro-air
 
 https://cocoroplusapp.jp.sharp/air
@@ -24,14 +21,8 @@ https://hacs.xyz/docs/faq/custom_repositories
 
 ## Configuration
 
-1. Go to https://cocoroplusapp.jp.sharp/air and sign in/up
-2. Get `device_id` from devtools
-3. Add following codes to your `configuration.yaml` file
-4. Restart Home Assistant
-
-```yaml
-cocoro_air:
-  email: YOUR_EMAIL
-  password: YOUR_PASSWORD
-  device_id: YOUR_DEVICE_ID
-```
+1. Ensure you have an account at [Cocoro Air](https://cocoroplusapp.jp.sharp/air).
+2. Go to **Settings** -> **Devices & Services** in Home Assistant.
+3. Click the **Add Integration** button.
+4. Search for **Cocoro Air**.
+5. Follow the on-screen instructions to enter your Email and Password, then select your device.
