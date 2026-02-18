@@ -101,6 +101,7 @@ class CocoroAirWaterTankSensor(BinarySensorEntity):
     """Representation of a Cocoro Air Water Tank Sensor."""
 
     _attr_device_class = BinarySensorDeviceClass.MOISTURE
+    _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_has_entity_name = True
     _attr_name = "Water tank"
     _attr_icon = "mdi:water"
