@@ -1,5 +1,6 @@
 """The Cocoro Air integration."""
 import logging
+import re
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
@@ -12,6 +13,8 @@ from homeassistant.util import Throttle
 DOMAIN = "cocoro_air"
 PLATFORMS = [Platform.SENSOR, Platform.HUMIDIFIER]
 MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=20)
+USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,20 +86,39 @@ class CocoroAir:
             res = await client.get('https://cocoroplusapp.jp.sharp/v1/cocoro-air/login')
             redirect_url = res.json()['redirectUrl']
 
-            res = await client.get(redirect_url, follow_redirects=True)
-            assert str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do') or str(res.url).startswith('https://cocoroplusapp.jp.sharp/air')
+            res = await client.get(redirect_url, follow_redirects=True, headers={'User-Agent': USER_AGENT})
+            assert '/u/login/identifier' in str(res.url) or str(res.url).startswith('https://cocoroplusapp.jp.sharp/air')
 
-            if str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do'):
+            if '/u/login/identifier' in str(res.url):
+                state = re.search(r'name="state" value="([^"]+)"', res.text).group(1)
                 res = await client.post(
-                    'https://cocoromembers.jp.sharp/sic-front/sso/A050101ExLoginAction.do',
+                    f'https://auth.cocoromembers.jp.sharp/u/login/identifier?state={state}',
                     data={
-                    'memberId': self.email,
-                    'password': self.password,
-                    'captchaText': '1',
-                    'autoLogin': 'on',
-                    'exsiteId': '50130',
-                },
-                follow_redirects=True
+                        'state': state,
+                        'username': self.email,
+                        'captcha': '',
+                        'js-available': 'true',
+                        'webauthn-available': 'false',
+                        'is-brave': 'false',
+                        'webauthn-platform-available': 'false',
+                        'action': 'default',
+                    },
+                    headers={'User-Agent': USER_AGENT},
+                    follow_redirects=True
+                )
+                assert '/u/login/password' in str(res.url)
+
+                state = re.search(r'name="state" value="([^"]+)"', res.text).group(1)
+                res = await client.post(
+                    f'https://auth.cocoromembers.jp.sharp/u/login/password?state={state}',
+                    data={
+                        'state': state,
+                        'username': self.email,
+                        'password': self.password,
+                        'action': 'default',
+                    },
+                    headers={'User-Agent': USER_AGENT},
+                    follow_redirects=True
                 )
                 assert res.status_code == 200
                 assert b'login=success' in str(res.url).encode()
