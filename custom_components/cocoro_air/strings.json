@@ -6,23 +6,29 @@
         "description": "Please enter your Cocoro Air credentials.",
         "data": {
           "email": "Email",
-          "password": "Password"
+          "password": "Password",
+          "device_id": "Device ID",
+          "model_name": "Model name"
         }
       },
-      "device": {
-        "title": "Select Device",
-        "description": "Please select the device you want to control.",
+      "reconfigure": {
+        "title": "Reconfigure Cocoro Air",
+        "description": "Update your Cocoro Air credentials or device settings.",
         "data": {
-          "device_id": "Device"
+          "email": "Email",
+          "password": "Password",
+          "device_id": "Device ID",
+          "model_name": "Model name"
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "no_devices_found": "No devices found"
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "Device is already configured"
+      "already_configured": "Device is already configured",
+      "reconfigure_successful": "Reconfiguration was successful"
     }
   }
 }
