@@ -74,7 +74,7 @@ class CocoroAir:
 
     _cache = None
 
-    def __init__(self, client, email, password, device_id, model_name):
+    def __init__(self, client, email, password, device_id=None, model_name=None):
         """Initialize the API client."""
         self.client = client
         self.email = email
@@ -83,12 +83,14 @@ class CocoroAir:
         self.model_name = model_name
         self.cache = {}
 
-        self.device_info = DeviceInfo(
-            identifiers={(DOMAIN, device_id)},
-            name=f"Cocoro Air {model_name}",
-            manufacturer="Sharp",
-            model=model_name,
-        )
+        self.device_info = None
+        if device_id and model_name:
+            self.device_info = DeviceInfo(
+                identifiers={(DOMAIN, device_id)},
+                name=f"Cocoro Air {model_name}",
+                manufacturer="Sharp",
+                model=model_name,
+            )
 
     async def login(self):
         """Login to Cocoro Air."""
@@ -134,6 +136,48 @@ class CocoroAir:
             assert b'login=success' in str(res.url).encode()
 
         _LOGGER.info('Login success')
+
+    async def query_devices(self, retried=False):
+        """Query the devices registered to this account."""
+        client = self.client
+        res = await client.get('https://cocoroplusapp.jp.sharp/v1/cocoro-air/deviceinfos')
+
+        if res.status_code == 401 and not retried:
+            _LOGGER.info('Login again')
+            await self.login()
+            return await self.query_devices(True)
+        elif res.status_code == 401:
+            _LOGGER.error('Login failed')
+            return []
+
+        res.raise_for_status()
+        data = res.json()
+
+        devices = []
+        # Structure: {"device_infos_...": {"body": {"devices": [...]}}}
+        for val in data.values():
+            if not (isinstance(val, dict) and 'devices' in val.get('body', {})):
+                continue
+
+            for item in val['body']['devices']:
+                name = item.get('device_name', item.get('device_id', 'Unknown'))
+                model = item.get('model_name', '')
+                place = item.get('place', '')
+
+                label = name
+                if model:
+                    label += f' ({model})'
+                if place:
+                    label += f' - {place}'
+
+                devices.append({
+                    'device_id': item['device_id'],
+                    'model_name': model,
+                    'label': label,
+                })
+
+        _LOGGER.debug(f'Discovered devices: {devices}')
+        return devices
 
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     async def update(self, retried=False):
