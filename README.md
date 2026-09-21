@@ -24,9 +24,10 @@ https://hacs.xyz/docs/faq/custom_repositories
 ## Configuration
 
 1. Ensure you have an account at [Cocoro Air](https://cocoroplusapp.jp.sharp/air).
-2. Get `device_id` and model name from browser devtools (e.g. from the Cocoro Air app).
-3. Go to **Settings** → **Devices & Services** in Home Assistant, click **Add Integration**, and search for **Cocoro Air**.
-4. Enter your email, password, device_id and model name.
+2. Go to **Settings** → **Devices & Services** in Home Assistant, click **Add Integration**, and search for **Cocoro Air**.
+3. Enter your email and password, then select your device from the list Home Assistant fetches automatically.
+
+To change the account or device later, use **Reconfigure** on the integration entry.
 
 ## Model supported
 
