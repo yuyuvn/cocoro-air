@@ -2,9 +2,12 @@
 import logging
 from datetime import timedelta
 
+import httpx
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import Throttle
@@ -43,6 +46,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         return True
 
+    except (httpx.TimeoutException, httpx.NetworkError) as ex:
+        # Transient connection problems (e.g. ConnectTimeout during startup).
+        # Raising ConfigEntryNotReady lets Home Assistant retry automatically
+        # with backoff instead of leaving the entry in a failed state. Other
+        # TransportError subclasses (protocol/proxy/unsupported-scheme) indicate
+        # bugs or misconfiguration, so let them propagate as real errors.
+        raise ConfigEntryNotReady(f"Could not connect to Cocoro Air: {ex}") from ex
     except Exception as ex:
         _LOGGER.error("Error setting up entry: %s", ex)
         raise
@@ -79,71 +89,71 @@ class CocoroAir:
 
     async def login(self):
         """Login to Cocoro Air."""
-        async with self.client as client:
-            res = await client.get('https://cocoroplusapp.jp.sharp/v1/cocoro-air/login')
-            redirect_url = res.json()['redirectUrl']
+        client = self.client
+        res = await client.get('https://cocoroplusapp.jp.sharp/v1/cocoro-air/login')
+        redirect_url = res.json()['redirectUrl']
 
-            res = await client.get(redirect_url, follow_redirects=True)
-            assert str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do') or str(res.url).startswith('https://cocoroplusapp.jp.sharp/air')
+        res = await client.get(redirect_url, follow_redirects=True)
+        assert str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do') or str(res.url).startswith('https://cocoroplusapp.jp.sharp/air')
 
-            if str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do'):
-                res = await client.post(
-                    'https://cocoromembers.jp.sharp/sic-front/sso/A050101ExLoginAction.do',
-                    data={
-                    'memberId': self.email,
-                    'password': self.password,
-                    'captchaText': '1',
-                    'autoLogin': 'on',
-                    'exsiteId': '50130',
-                },
-                follow_redirects=True
-                )
-                assert res.status_code == 200
-                assert b'login=success' in str(res.url).encode()
+        if str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do'):
+            res = await client.post(
+                'https://cocoromembers.jp.sharp/sic-front/sso/A050101ExLoginAction.do',
+                data={
+                'memberId': self.email,
+                'password': self.password,
+                'captchaText': '1',
+                'autoLogin': 'on',
+                'exsiteId': '50130',
+            },
+            follow_redirects=True
+            )
+            assert res.status_code == 200
+            assert b'login=success' in str(res.url).encode()
 
-            _LOGGER.info('Login success')
+        _LOGGER.info('Login success')
 
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     async def update(self, retried=False):
         """Call the API."""
-        async with self.client as client:
-            res = await client.get(
-                # 'https://cocoroplusapp.jp.sharp/v1/cocoro-air/objects-conceal/air-cleaner',
-                'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sensors-conceal/air-cleaner',
-                params={
-                    'device_id': self.device_id,
-                    'event_key': 'echonet_property',
-                    'opc': 'k1+k2+k3',
-                    'epc': '0x80+0x86',
-                }
-            )
-            if res.status_code == 401 and not retried:
-                _LOGGER.info('Login again')
-                await self.login()
-                return await self.update(True)
-            elif res.status_code == 401:
-                _LOGGER.error('Login failed')
-                return None
+        client = self.client
+        res = await client.get(
+            # 'https://cocoroplusapp.jp.sharp/v1/cocoro-air/objects-conceal/air-cleaner',
+            'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sensors-conceal/air-cleaner',
+            params={
+                'device_id': self.device_id,
+                'event_key': 'echonet_property',
+                'opc': 'k1+k2+k3',
+                'epc': '0x80+0x86',
+            }
+        )
+        if res.status_code == 401 and not retried:
+            _LOGGER.info('Login again')
+            await self.login()
+            return await self.update(True)
+        elif res.status_code == 401:
+            _LOGGER.error('Login failed')
+            return None
 
-            _LOGGER.debug(f'cocoro-air response: {res.text}')
+        _LOGGER.debug(f'cocoro-air response: {res.text}')
 
-            response_data = self.cache
-            try:
-                # data = res.json()['objects_aircleaner_020']['body']['data']
-                data = res.json()['sensors_aircleaner_021']['body']['data']
-                for item in data:
-                    if 'k1' in item:
-                        response_data['k1'] = item['k1']
-                    if 'k2' in item:
-                        response_data['k2'] = item['k2']
-                    if 'k3' in item:
-                        response_data['k3'] = item['k3']
-            except (KeyError, IndexError) as e:
-                _LOGGER.error(f'Failed to get data, response: {res.text}')
-                return None
+        response_data = self.cache
+        try:
+            # data = res.json()['objects_aircleaner_020']['body']['data']
+            data = res.json()['sensors_aircleaner_021']['body']['data']
+            for item in data:
+                if 'k1' in item:
+                    response_data['k1'] = item['k1']
+                if 'k2' in item:
+                    response_data['k2'] = item['k2']
+                if 'k3' in item:
+                    response_data['k3'] = item['k3']
+        except (KeyError, IndexError) as e:
+            _LOGGER.error(f'Failed to get data, response: {res.text}')
+            return None
 
-            self.cache = response_data
-            return response_data
+        self.cache = response_data
+        return response_data
 
     def get_sensor_data(self, data=None, retried=False):
         """Get sensor data from Cocoro Air."""
@@ -181,37 +191,37 @@ class CocoroAir:
 
         mode_value = 'FF' if mode == 'on' else '00'
 
-        async with self.client as client:
-            res = await client.post(
-                'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sync/air-cleaner',
-                json={
-                    'additional_request': False,
-                    'deviceToken': self.device_id,
-                    'event_key': 'echonet_control',
-                    'data': [
-                        {'opc': "k3", 'odt': {'s5': "00", 's7': mode_value}}
-                    ],
-                    'model_name': self.model_name,
-                }
-            )
+        client = self.client
+        res = await client.post(
+            'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sync/air-cleaner',
+            json={
+                'additional_request': False,
+                'deviceToken': self.device_id,
+                'event_key': 'echonet_control',
+                'data': [
+                    {'opc': "k3", 'odt': {'s5': "00", 's7': mode_value}}
+                ],
+                'model_name': self.model_name,
+            }
+        )
 
-            if res.status_code == 401 and not retried:
-                _LOGGER.info('Login again')
-                await self.login()
-                return await self.set_humidity_mode(mode, True)
-            elif res.status_code == 401:
-                _LOGGER.error('Login failed')
-                return False
+        if res.status_code == 401 and not retried:
+            _LOGGER.info('Login again')
+            await self.login()
+            return await self.set_humidity_mode(mode, True)
+        elif res.status_code == 401:
+            _LOGGER.error('Login failed')
+            return False
 
-            if res.status_code != 200:
-                _LOGGER.error(f'Failed to set humidity mode, status code: {res.status_code}, response: {res.text}')
-                return False
+        if res.status_code != 200:
+            _LOGGER.error(f'Failed to set humidity mode, status code: {res.status_code}, response: {res.text}')
+            return False
 
-            _LOGGER.debug(f'Set humidity mode response: {res.text}')
+        _LOGGER.debug(f'Set humidity mode response: {res.text}')
 
-            if not self.cache:
-                self.cache = {}
-            if 'k3' not in self.cache:
-                self.cache['k3'] = {}
-            self.cache['k3']['s7'] = mode_value
-            return True
+        if not self.cache:
+            self.cache = {}
+        if 'k3' not in self.cache:
+            self.cache['k3'] = {}
+        self.cache['k3']['s7'] = mode_value
+        return True
