@@ -5,6 +5,7 @@ from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import Throttle
@@ -26,14 +27,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         client = get_async_client(hass)
         cocoro_air_api = CocoroAir(
             client,
-            entry.data["email"],
-            entry.data["password"],
+            entry.data["cookie"],
             entry.data["device_id"],
             entry.data["model_name"],
         )
 
-        # Test the connection
-        await cocoro_air_api.login()
+        # Verify the stored session cookie is still valid
+        try:
+            await cocoro_air_api.login()
+        except InvalidSession as err:
+            raise ConfigEntryAuthFailed(
+                "Session cookie is invalid or expired, please reauthenticate"
+            ) from err
 
         hass.data[DOMAIN][entry.entry_id] = {
             "cocoro_air_api": cocoro_air_api,
@@ -43,6 +48,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         return True
 
+    except ConfigEntryAuthFailed:
+        raise
     except Exception as ex:
         _LOGGER.error("Error setting up entry: %s", ex)
         raise
@@ -61,13 +68,19 @@ class CocoroAir:
 
     _cache = None
 
-    def __init__(self, client, email, password, device_id, model_name):
-        """Initialize the API client."""
+    def __init__(self, client, cookie, device_id, model_name):
+        """Initialize the API client.
+
+        `cookie` is the raw `Cookie` request header captured from a browser
+        that has completed a full login (including CAPTCHA/2FA) at
+        https://cocoroplusapp.jp.sharp/air. Sharp's Auth0 login page gates
+        automated credential submission behind a CAPTCHA, so this integration
+        can no longer log in with just an email/password.
+        """
         self.client = client
-        self.email = email
-        self.password = password
         self.device_id = device_id
         self.model_name = model_name
+        self.headers = {"Cookie": cookie}
         self.cache = {}
 
         self.device_info = DeviceInfo(
@@ -78,33 +91,25 @@ class CocoroAir:
         )
 
     async def login(self):
-        """Login to Cocoro Air."""
+        """Verify the stored session cookie is still valid."""
         async with self.client as client:
-            res = await client.get('https://cocoroplusapp.jp.sharp/v1/cocoro-air/login')
-            redirect_url = res.json()['redirectUrl']
-
-            res = await client.get(redirect_url, follow_redirects=True)
-            assert str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do') or str(res.url).startswith('https://cocoroplusapp.jp.sharp/air')
-
-            if str(res.url).endswith('/sic-front/sso/ExLoginViewAction.do'):
-                res = await client.post(
-                    'https://cocoromembers.jp.sharp/sic-front/sso/A050101ExLoginAction.do',
-                    data={
-                    'memberId': self.email,
-                    'password': self.password,
-                    'captchaText': '1',
-                    'autoLogin': 'on',
-                    'exsiteId': '50130',
+            res = await client.get(
+                'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sensors-conceal/air-cleaner',
+                params={
+                    'device_id': self.device_id,
+                    'event_key': 'echonet_property',
+                    'opc': 'k1+k2+k3',
+                    'epc': '0x80+0x86',
                 },
-                follow_redirects=True
-                )
-                assert res.status_code == 200
-                assert b'login=success' in str(res.url).encode()
+                headers=self.headers,
+            )
+            if res.status_code == 401:
+                raise InvalidSession("Session cookie is invalid or expired")
 
-            _LOGGER.info('Login success')
+            _LOGGER.info('Session cookie is valid')
 
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
-    async def update(self, retried=False):
+    async def update(self):
         """Call the API."""
         async with self.client as client:
             res = await client.get(
@@ -115,14 +120,11 @@ class CocoroAir:
                     'event_key': 'echonet_property',
                     'opc': 'k1+k2+k3',
                     'epc': '0x80+0x86',
-                }
+                },
+                headers=self.headers,
             )
-            if res.status_code == 401 and not retried:
-                _LOGGER.info('Login again')
-                await self.login()
-                return await self.update(True)
-            elif res.status_code == 401:
-                _LOGGER.error('Login failed')
+            if res.status_code == 401:
+                _LOGGER.error('Session cookie has expired, reauthenticate to restore updates')
                 return None
 
             _LOGGER.debug(f'cocoro-air response: {res.text}')
@@ -174,7 +176,7 @@ class CocoroAir:
         _LOGGER.debug(f'Parsed sensor data: {parsed}')
         return parsed
 
-    async def set_humidity_mode(self, mode, retried=False):
+    async def set_humidity_mode(self, mode):
         """Set the humidity mode of the air purifier."""
         if mode not in ['on', 'off']:
             raise ValueError("Mode must be either 'on' or 'off'")
@@ -192,15 +194,12 @@ class CocoroAir:
                         {'opc': "k3", 'odt': {'s5': "00", 's7': mode_value}}
                     ],
                     'model_name': self.model_name,
-                }
+                },
+                headers=self.headers,
             )
 
-            if res.status_code == 401 and not retried:
-                _LOGGER.info('Login again')
-                await self.login()
-                return await self.set_humidity_mode(mode, True)
-            elif res.status_code == 401:
-                _LOGGER.error('Login failed')
+            if res.status_code == 401:
+                _LOGGER.error('Session cookie has expired, reauthenticate to restore control')
                 return False
 
             if res.status_code != 200:
@@ -215,3 +214,7 @@ class CocoroAir:
                 self.cache['k3'] = {}
             self.cache['k3']['s7'] = mode_value
             return True
+
+
+class InvalidSession(Exception):
+    """Raised when the stored session cookie is invalid or expired."""
