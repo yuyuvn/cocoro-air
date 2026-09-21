@@ -27,7 +27,7 @@ Sharp's login page now requires solving a CAPTCHA, so this integration can no lo
 
 1. Ensure you have an account at [Cocoro Air](https://cocoroplusapp.jp.sharp/air).
 2. Log in fully (including any CAPTCHA/2FA prompts) at https://cocoroplusapp.jp.sharp/air in your browser.
-3. Open devtools → Network tab, find any request to `cocoroplusapp.jp.sharp`, and copy the value of its `Cookie` request header.
+3. Open devtools → Network tab, find any request to `cocoroplusapp.jp.sharp`, and copy the value of its `Cookie` request header. Make sure it includes the `jsessionid=...` cookie — that's the one that carries your session.
 4. Get `device_id` and model name from browser devtools (e.g. from the Cocoro Air app).
 5. Go to **Settings** → **Devices & Services** in Home Assistant, click **Add Integration**, and search for **Cocoro Air**.
 6. Paste the cookie header, device_id and model name.

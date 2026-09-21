@@ -44,6 +44,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     try:
         await api.login()
     except Exception as err:
+        _LOGGER.error("Cocoro Air session validation failed: %s", err)
         raise InvalidAuth from err
 
     return {"title": f"Cocoro Air {data['model_name']} ({data['device_id']})"}

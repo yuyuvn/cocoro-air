@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Authentication",
-        "description": "Sharp's login page requires solving a CAPTCHA, so log in once at https://cocoroplusapp.jp.sharp/air in your browser, then copy the `Cookie` request header from a request to cocoroplusapp.jp.sharp in your browser's devtools and paste it below.",
+        "description": "Sharp's login page requires solving a CAPTCHA, so log in once at https://cocoroplusapp.jp.sharp/air in your browser, then copy the `Cookie` request header from a request to cocoroplusapp.jp.sharp in your browser's devtools and paste it below. Make sure it includes the `jsessionid=...` cookie — that's the one that carries your session.",
         "data": {
           "cookie": "Cookie header",
           "device_id": "Device ID",
@@ -12,7 +12,7 @@
       },
       "reconfigure": {
         "title": "Reconfigure Cocoro Air",
-        "description": "Update your Cocoro Air session cookie or device settings.",
+        "description": "Update your Cocoro Air session cookie or device settings. Make sure the cookie you paste includes `jsessionid=...`.",
         "data": {
           "cookie": "Cookie header",
           "device_id": "Device ID",
@@ -21,7 +21,7 @@
       },
       "reauth_confirm": {
         "title": "Reauthenticate Cocoro Air",
-        "description": "Your session cookie has expired. Log in again at https://cocoroplusapp.jp.sharp/air, copy the `Cookie` request header, and paste it below.",
+        "description": "Your session cookie has expired. Log in again at https://cocoroplusapp.jp.sharp/air, copy the `Cookie` request header (make sure it includes `jsessionid=...`), and paste it below.",
         "data": {
           "cookie": "Cookie header"
         }

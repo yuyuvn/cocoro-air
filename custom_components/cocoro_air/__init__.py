@@ -103,8 +103,10 @@ class CocoroAir:
                 },
                 headers=self.headers,
             )
-            if res.status_code == 401:
-                raise InvalidSession("Session cookie is invalid or expired")
+            if res.status_code != 200:
+                raise InvalidSession(
+                    f"Unexpected status {res.status_code} from session check: {res.text[:500]!r}"
+                )
 
             _LOGGER.info('Session cookie is valid')
 
