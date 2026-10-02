@@ -10,9 +10,9 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.helpers.httpx_client import create_async_httpx_client
 
-from . import DOMAIN, CocoroAir
+from . import DOMAIN, CocoroAirLoginError, CocoroAirSession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,17 +24,21 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> CocoroAir:
-    """Validate the user input allows us to connect and return the logged-in client."""
-    client = get_async_client(hass)
-    api = CocoroAir(client, data["email"], data["password"])
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Log in with the given credentials and return the account's devices.
 
+    Uses a throwaway client so the flow never touches the cookies of the
+    session that the running entries share.
+    """
+    session = CocoroAirSession(create_async_httpx_client(hass, auto_cleanup=False))
     try:
-        await api.login()
-    except Exception as err:
-        raise InvalidAuth from err
-
-    return api
+        try:
+            await session.async_login(data["email"], data["password"])
+        except CocoroAirLoginError as err:
+            raise InvalidAuth from err
+        return await session.async_query_devices(data["email"], data["password"])
+    finally:
+        await session.async_close()
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -49,12 +53,26 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._devices: list[dict[str, Any]] = []
 
     async def _async_login_and_discover(
-        self, user_input: dict[str, Any], errors: dict[str, str]
+        self,
+        user_input: dict[str, Any],
+        errors: dict[str, str],
+        exclude_entry_id: str | None = None,
     ) -> bool:
-        """Log in and populate self._devices. Returns True on success."""
+        """Log in and populate self._devices. Returns True on success.
+
+        Every entry shares one account session, so the email must match the
+        entries that already exist (except the one being reconfigured).
+        """
+        if any(
+            entry.data.get("email") != user_input["email"]
+            for entry in self._async_current_entries()
+            if entry.entry_id != exclude_entry_id
+        ):
+            errors["base"] = "single_account"
+            return False
+
         try:
-            api = await validate_input(self.hass, user_input)
-            self._devices = await api.query_devices()
+            self._devices = await validate_input(self.hass, user_input)
         except InvalidAuth:
             errors["base"] = "invalid_auth"
         except Exception:  # pylint: disable=broad-except
@@ -123,7 +141,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         reconfigure_entry = self._get_reconfigure_entry()
 
         if user_input is not None and await self._async_login_and_discover(
-            user_input, errors
+            user_input, errors, exclude_entry_id=reconfigure_entry.entry_id
         ):
             return await self.async_step_reconfigure_device()
 

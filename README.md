@@ -29,6 +29,9 @@ https://hacs.xyz/docs/faq/custom_repositories
 
 To change the account or device later, use **Reconfigure** on the integration entry.
 
+One Home Assistant instance can use a single Cocoro Air account: every device
+shares that account's login session, so a second entry must use the same email.
+
 ## Model supported
 
 Model that has been tested:

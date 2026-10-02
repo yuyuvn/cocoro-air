@@ -36,6 +36,7 @@
       "cannot_connect": "Failed to connect",
       "no_devices_found": "No devices found",
       "invalid_auth": "Invalid authentication",
+      "single_account": "Only one Cocoro Air account can be configured. Use the same email as the existing entries.",
       "unknown": "Unexpected error"
     },
     "abort": {

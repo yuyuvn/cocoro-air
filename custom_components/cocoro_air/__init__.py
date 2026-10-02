@@ -1,4 +1,5 @@
 """The Cocoro Air integration."""
+import asyncio
 import logging
 import re
 from datetime import timedelta
@@ -8,12 +9,15 @@ import httpx
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
+from homeassistant.helpers.httpx_client import create_async_httpx_client
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import Throttle
 
 DOMAIN = "cocoro_air"
+# The account session shared by every config entry. It lives outside
+# hass.data[DOMAIN], which maps entry ids to their device objects.
+SESSION_KEY = f"{DOMAIN}_session"
 PLATFORMS = [Platform.SENSOR, Platform.HUMIDIFIER]
 MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=20)
 USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
@@ -22,39 +26,53 @@ USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
 _LOGGER = logging.getLogger(__name__)
 
 
+class CocoroAirLoginError(Exception):
+    """The login flow did not end on the expected page."""
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Cocoro Air from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
     _LOGGER.debug("Setting up entry: %s", entry.as_dict())
 
-    try:
-        client = get_async_client(hass)
-        cocoro_air_api = CocoroAir(
-            client,
-            entry.data["email"],
-            entry.data["password"],
-            entry.data["device_id"],
-            entry.data["model_name"],
+    session = hass.data.get(SESSION_KEY)
+    if session is None:
+        session = CocoroAirSession(create_async_httpx_client(hass))
+        hass.data[SESSION_KEY] = session
+
+    email = entry.data["email"]
+    if session.email is not None and session.email != email:
+        raise ConfigEntryError(
+            "Only one Cocoro Air account can be used per Home Assistant instance; "
+            f"the session is logged in as {session.email}"
         )
 
-        # Test the connection
-        await cocoro_air_api.login()
+    try:
+        await session.async_login(email, entry.data["password"])
 
         hass.data[DOMAIN][entry.entry_id] = {
-            "cocoro_air_api": cocoro_air_api,
+            "cocoro_air_api": CocoroAir(
+                session,
+                email,
+                entry.data["password"],
+                entry.data["device_id"],
+                entry.data["model_name"],
+            ),
         }
 
         # Load platforms one at a time to avoid blocking imports
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         return True
 
-    except (httpx.TimeoutException, httpx.NetworkError) as ex:
-        # Transient connection problems (e.g. ConnectTimeout during startup).
-        # Raising ConfigEntryNotReady lets Home Assistant retry automatically
-        # with backoff instead of leaving the entry in a failed state. Other
-        # TransportError subclasses (protocol/proxy/unsupported-scheme) indicate
-        # bugs or misconfiguration, so let them propagate as real errors.
+    except (httpx.TimeoutException, httpx.NetworkError, CocoroAirLoginError) as ex:
+        # Transient connection problems (e.g. ConnectTimeout during startup)
+        # and login flows that end on an unexpected page. Raising
+        # ConfigEntryNotReady lets Home Assistant retry automatically with
+        # backoff instead of leaving the entry in a failed state. Other
+        # TransportError subclasses (protocol/proxy/unsupported-scheme)
+        # indicate bugs or misconfiguration, so let them propagate as real
+        # errors.
         raise ConfigEntryNotReady(f"Could not connect to Cocoro Air: {ex}") from ex
     except Exception as ex:
         _LOGGER.error("Error setting up entry: %s", ex)
@@ -65,87 +83,109 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
+        if not hass.data[DOMAIN] and (session := hass.data.pop(SESSION_KEY, None)):
+            await session.async_close()
 
     return unload_ok
 
 
-class CocoroAir:
-    """Cocoro Air API Client."""
+class CocoroAirSession:
+    """One logged-in Cocoro Air account.
 
-    _cache = None
+    Owns the httpx client and therefore the cookies that carry the login.
+    The Auth0 flow binds its state to session cookies, so two logins running
+    at the same time in one cookie jar break each other; every login goes
+    through the lock and later callers find the jar already logged in.
+    """
 
-    def __init__(self, client, email, password, device_id=None, model_name=None):
-        """Initialize the API client."""
+    def __init__(self, client: httpx.AsyncClient):
+        """Initialize the session."""
         self.client = client
-        self.email = email
-        self.password = password
-        self.device_id = device_id
-        self.model_name = model_name
-        self.cache = {}
+        self.email: str | None = None
+        self._lock = asyncio.Lock()
+        self._logged_in = False
 
-        self.device_info = None
-        if device_id and model_name:
-            self.device_info = DeviceInfo(
-                identifiers={(DOMAIN, device_id)},
-                name=f"Cocoro Air {model_name}",
-                manufacturer="Sharp",
-                model=model_name,
-            )
+    async def async_close(self) -> None:
+        """Close the HTTP client."""
+        await self.client.aclose()
 
-    async def login(self):
-        """Login to Cocoro Air."""
+    async def async_login(self, email: str, password: str, *, force: bool = False) -> None:
+        """Log in unless the session is already logged in.
+
+        Pass force=True after a 401 to log in again.
+        """
+        async with self._lock:
+            if self._logged_in and not force:
+                return
+            self._logged_in = False
+            await self._async_run_login_flow(email, password)
+            self._logged_in = True
+            self.email = email
+
+    async def _async_run_login_flow(self, email: str, password: str) -> None:
         client = self.client
         res = await client.get('https://cocoroplusapp.jp.sharp/v1/cocoro-air/login')
         redirect_url = res.json()['redirectUrl']
 
         res = await client.get(redirect_url, follow_redirects=True, headers={'User-Agent': USER_AGENT})
-        assert '/u/login/identifier' in str(res.url) or str(res.url).startswith('https://cocoroplusapp.jp.sharp/air')
+        if str(res.url).startswith('https://cocoroplusapp.jp.sharp/air'):
+            # The cookies already carry a login; Auth0 sent us straight back.
+            _LOGGER.info('Login success')
+            return
+        if '/u/login/identifier' not in str(res.url):
+            raise CocoroAirLoginError(f'Unexpected login page: {res.status_code} {res.url}')
 
-        if '/u/login/identifier' in str(res.url):
-            state = re.search(r'name="state" value="([^"]+)"', res.text).group(1)
-            res = await client.post(
-                f'https://auth.cocoromembers.jp.sharp/u/login/identifier?state={state}',
-                data={
-                    'state': state,
-                    'username': self.email,
-                    'captcha': '',
-                    'js-available': 'true',
-                    'webauthn-available': 'false',
-                    'is-brave': 'false',
-                    'webauthn-platform-available': 'false',
-                    'action': 'default',
-                },
-                headers={'User-Agent': USER_AGENT},
-                follow_redirects=True
-            )
-            assert '/u/login/password' in str(res.url)
+        state = self._extract_state(res)
+        res = await client.post(
+            f'https://auth.cocoromembers.jp.sharp/u/login/identifier?state={state}',
+            data={
+                'state': state,
+                'username': email,
+                'captcha': '',
+                'js-available': 'true',
+                'webauthn-available': 'false',
+                'is-brave': 'false',
+                'webauthn-platform-available': 'false',
+                'action': 'default',
+            },
+            headers={'User-Agent': USER_AGENT},
+            follow_redirects=True
+        )
+        if '/u/login/password' not in str(res.url):
+            raise CocoroAirLoginError(f'Unexpected page after identifier step: {res.status_code} {res.url}')
 
-            state = re.search(r'name="state" value="([^"]+)"', res.text).group(1)
-            res = await client.post(
-                f'https://auth.cocoromembers.jp.sharp/u/login/password?state={state}',
-                data={
-                    'state': state,
-                    'username': self.email,
-                    'password': self.password,
-                    'action': 'default',
-                },
-                headers={'User-Agent': USER_AGENT},
-                follow_redirects=True
-            )
-            assert res.status_code == 200
-            assert b'login=success' in str(res.url).encode()
+        state = self._extract_state(res)
+        res = await client.post(
+            f'https://auth.cocoromembers.jp.sharp/u/login/password?state={state}',
+            data={
+                'state': state,
+                'username': email,
+                'password': password,
+                'action': 'default',
+            },
+            headers={'User-Agent': USER_AGENT},
+            follow_redirects=True
+        )
+        if res.status_code != 200 or 'login=success' not in str(res.url):
+            raise CocoroAirLoginError(f'Unexpected page after password step: {res.status_code} {res.url}')
 
         _LOGGER.info('Login success')
 
-    async def query_devices(self, retried=False):
+    @staticmethod
+    def _extract_state(res: httpx.Response) -> str:
+        match = re.search(r'name="state" value="([^"]+)"', res.text)
+        if match is None:
+            raise CocoroAirLoginError(f'No state field on {res.url}')
+        return match.group(1)
+
+    async def async_query_devices(self, email: str, password: str, retried: bool = False):
         """Query the devices registered to this account."""
-        client = self.client
-        res = await client.get('https://cocoroplusapp.jp.sharp/v1/cocoro-air/deviceinfos')
+        res = await self.client.get('https://cocoroplusapp.jp.sharp/v1/cocoro-air/deviceinfos')
 
         if res.status_code == 401 and not retried:
             _LOGGER.info('Login again')
-            await self.login()
-            return await self.query_devices(True)
+            await self.async_login(email, password, force=True)
+            return await self.async_query_devices(email, password, True)
         elif res.status_code == 401:
             _LOGGER.error('Login failed')
             return []
@@ -179,10 +219,34 @@ class CocoroAir:
         _LOGGER.debug(f'Discovered devices: {devices}')
         return devices
 
+
+class CocoroAir:
+    """One Cocoro Air device, talking through the shared account session."""
+
+    def __init__(self, session: CocoroAirSession, email, password, device_id, model_name):
+        """Initialize the device client."""
+        self.session = session
+        self.email = email
+        self.password = password
+        self.device_id = device_id
+        self.model_name = model_name
+        self.cache = {}
+
+        self.device_info = DeviceInfo(
+            identifiers={(DOMAIN, device_id)},
+            name=f"Cocoro Air {model_name}",
+            manufacturer="Sharp",
+            model=model_name,
+        )
+
+    async def login(self):
+        """Log the shared session in again."""
+        await self.session.async_login(self.email, self.password, force=True)
+
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     async def update(self, retried=False):
         """Call the API."""
-        client = self.client
+        client = self.session.client
         res = await client.get(
             # 'https://cocoroplusapp.jp.sharp/v1/cocoro-air/objects-conceal/air-cleaner',
             'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sensors-conceal/air-cleaner',
@@ -257,7 +321,7 @@ class CocoroAir:
 
         mode_value = 'FF' if mode == 'on' else '00'
 
-        client = self.client
+        client = self.session.client
         res = await client.post(
             'https://cocoroplusapp.jp.sharp/v1/cocoro-air/sync/air-cleaner',
             json={
